@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>Beat Battle</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+  <script type="text/javascript" src="https://www.guitarland.com/javascripts/Tone.js"></script>
+  <script src="https://www.guitarland.com/javascripts/Rhythm.js"></script>
+   
+  <script type="text/javascript" src="https://www.guitarland.com/javascripts/StartAudioContext.js"></script>
+  <script src="https://www.desmos.com/api/v1.4/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"></script>
+  <link href="https://fonts.googleapis.com/css?family=Raleway&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://unpkg.com/@webcomponents/webcomponentsjs@^2/webcomponents-bundle.js"></script>
+  <script src="https://unpkg.com/tone"></script>
+  <script src="https://unpkg.com/@tonejs/ui"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  
+<style>
+		#calculator {
+		width: 100vw;
+		height: 100vh;
+		margin: 0 0 0 -.5vw;
+		padding: 0 0 0 0;
+	  }
+</style>
+</head>
+<body>
+        <div id="calculator"></div>
+<script>
+    var elt = document.getElementById('calculator');
+    const calc = Desmos.GraphingCalculator(document.getElementById('calculator'));
+	calc.updateSettings({ zoomButtons: false});
+	calc.updateSettings({ expressions: false});
+	calc.updateSettings({ lockViewport: true});
+	calc.updateSettings({ settingsMenu: false});
+    calc.updateSettings({ border: true});
+     
+     Desmos.$.getJSON('https://www.desmos.com/calculator/lj26pz0to9').done(({ state }) => calc.setState(state));
+
+var delayTime = 0;
+var synth = null;
+var convertedNotes=[];
+var newNotes= [];
+var newerNotes= "12";
+var loopNow;
+var loopTrue = true;
+
+/******************************************
+Start up the synth after the calc has loaded
+*******************************************/
+
+
+	setTimeout(function () {
+		calc.setExpression({ id: 'C', latex: 'C=[0,0]'});	
+		Go();
+		updateDrumMachine();
+	}, 1000);
+	var playing = false;
+	var playButton;
+
+function Go() {
+
+		playing = false;
+		var noteLengths1 = calc.HelperExpression({ latex: 'N_{otes}' });
+
+		noteLengths1.observe('listValue', function () {
+			if (noteLengths1.listValue.length > 1) {  //
+
+
+				if (playing) {
+
+					stopIt();
+					updateMute();
+					RefreshHiHat();
+					RefreshConga();
+					
+
+				}
+			}
+		});
+
+
+  var counter = calc.HelperExpression({latex: 'T_{ick}'});
+  counter.observe('numericValue', function () {
+  if(playing){
+	var loopNow1 = calc.HelperExpression({latex: 'L_{oopIt}'});
+	loopNow1.observe('numericValue', function () {
+	console.log("loop: "+loopNow1.numericValue)
+	  if(Tone.Transport.ticks>400 && loopNow1.numericValue==0){
+		//  alert("hi")
+		calc.setExpression({ id: 'C', latex: 'C=[0,0]'});	
+	  }
+	});
+  calc.setExpression({ id: 'T_{Time}', latex: 'T_{Time}='+Tone.Transport.ticks});
+  }
+	})
+
+playButton = calc.HelperExpression({latex: 'G_{o}'});
+  playButton.observe('numericValue', function () {
+    calc.setExpression({ id: 'T_{Time}', latex: 'T_{Time}=0'});
+      if(noteLengths1.listValue.length >1){
+        if (playButton.numericValue==1) {
+         
+          updateDrumMachine();
+          console.log("Play");
+            playing = true;
+            
+        }
+      }
+      if (playButton.numericValue==0){
+            playing=false;
+            stopIt();
+      }
+
+  });
+
+
+loopNow = calc.HelperExpression({latex: 'L_{oopIt}'});
+loopNow.observe('numericValue', function () {
+  
+ if(loopNow.numericValue==1){
+  console.log("loop ON")
+  loopTrue=true;
+ }
+ if(loopNow.numericValue==0){
+ loopTrue=false;
+ console.log("loop OFF")
+ }
+ //stopIt();
+ Tone.Transport.loop=loopTrue;
+ //updateDrumMachine();
+}); 
+}
+
+
+function UpdateNotes(){
+    var noteLengths = calc.HelperExpression({ latex: 'N_{otes}' });
+    noteLengths.observe('listValue', function () {
+        convertedNotes = []; 
+        var noteHolderArr = [4, 4, 4];
+        var i=0;
+        noteHolderArr=noteLengths.listValue;
+        noteHolderArr.shift();
+        for(i=0; i<noteHolderArr.length; i++){
+            if(noteHolderArr[i]==0){
+                  convertedNotes.push('C4');
+                  }    
+            if(noteHolderArr[i]==1){
+                  convertedNotes.push('Bb3');
+                  }
+            if(noteHolderArr[i]==2){
+                  convertedNotes.push('G3');
+            }				
+            if(noteHolderArr[i]==4){
+            convertedNotes.push('C4');
+            }
+        } 
+      newNotes= [];
+      newerNotes= [];
+      noteHolderArr.forEach(function(item){ 
+        newNotes.push(6*item);
+      })   
+      newerNotes = newNotes.toString();
+    });
+}
+                      
+
+function playDelay(){
+    var melody = ["C4","D4","E4","F4","G4","A4","B4","C5"];
+    var timeMenu = document.getElementById("delay");
+    delayTime = Number(timeMenu.options[timeMenu.selectedIndex].value)/1000;
+    if(!synth) {
+        synth = new Tone.Synth().toMaster();
+    }
+    var pattern = new Tone.Pattern(function(time, note){
+    //the order of the notes passed in depends on the pattern
+    synth.triggerAttackRelease(note, "4n", time);
+    }, melody, "alternateDown").start(0);    
+
+    var synth2 = new Tone.Synth().toMaster();
+    var pattern2 = new Tone.Pattern(function(time, note){
+    //the order of the notes passed in depends on the pattern
+    synth2.triggerAttackRelease(note, "4n", time);
+    }, melody, "alternateDown").start(delayTime);    
+    
+	var tempo = 120;
+   // Tone.Transport.bpm.value = tempo   
+   // Tone.Transport.start("+0.1");
+}
+
+
+function stopIt(){
+  console.log("Stop");
+ // Tone.Transport.stop();
+ 
+   Tone.Transport.cancel(0);
+   //Tone.Transport.start("1:0");
+   if(synth) {
+       synth.dispose();
+       synth = null;
+   }
+   if(piano) {
+       piano.dispose();
+       piano = null;
+   }
+   if(kick) {
+       kick.dispose();
+       kick = null;
+   }
+   if(snare) {
+       snare.dispose();
+       snare = null;
+   }
+   if(conga) {
+       conga.dispose();
+       conga = null;
+   }
+}
+
+function updateDrumMachine(){
+  //stopIt();
+ 
+  UpdateNotes();
+  DrumMachine();
+
+}
+function updateTempo()  {
+//	var tempo = document.myForm.tempo.value;
+  //Tone.Transport.bpm.value = tempo   
+  //UpdateNotes();
+}
+
+
+function updateVolume()  {
+	kick.volume.value = -5;
+	snare.volume.value = -10;
+	conga.volume.value = -10;
+	closedHiHat.volume.value = -10;
+}
+
+function updateMute()  {
+  	var muteIt = false;
+ 	var muteConga = false;
+	var muteKickBoolean = muteIt;
+	var muteSnareBoolean = muteIt;
+	var muteCongaBoolean = muteConga;
+
+  	var drumsOn = calc.HelperExpression({latex: 'D_{rums}'});
+  drumsOn.observe('numericValue', function () {
+ if(drumsOn.numericValue==1){
+    muteIt = false;
+ }
+ if(drumsOn.numericValue==0){
+   muteIt = true;
+ }
+ muteConga = false;
+ 
+
+ 	kickPart.mute = muteIt;
+	snarePart.mute = muteIt;
+  congaPart.mute = muteConga;
+  //  hiHatPart.mute = muteHiHatBoolean? true: false;
+  //Tone.Transport.start("+0.1");
+    
+  })
+}
+
+var kick = null;
+var snare = null;
+var conga = null;
+var closedHiHat=null;
+//	KICK
+function makeKick() {
+	var kick = new Tone.MembraneSynth({
+		"volume" : 5,
+		"envelope" : {
+			"sustain" : 0.05,
+			"attack" : .02,
+			"decay" : .2
+		},
+		"octaves" : 2
+	}).toMaster();
+	return kick;
+}
+
+
+
+//	SNARE
+function makeSnare() {
+	var snare = new Tone.NoiseSynth({
+		"volume" : -7,
+		"envelope" : {
+			"attack" : 0.001,
+			"decay" : 0.5,
+			"sustain" : 0.01,
+			"release" : 0.02
+		},
+		"filterEnvelope" : {
+			"attack" : 0.001,
+			"decay" : 0.1,
+			"sustain" : 0.4,
+			"release" : 0.1
+		}
+	}).toMaster();
+    return snare;
+}
+
+//  CONGA
+function makeConga() {
+	var conga = new Tone.MembraneSynth({
+		"pitchDecay" : 0.001,
+		"octaves" : 3,
+		"envelope" : {
+		"attack" : 0.001,
+     	"sustain" : .3,
+		"release" : .9,
+		}
+	}).toMaster();
+	conga.type = "square";
+	return conga;
+}
+
+	var lowPass = new Tone.Filter({
+		"frequency": 14000,
+	}).toMaster();
+
+//  CLOSED HIHAT
+    var closedHiHat = new Tone.NoiseSynth({
+		"volume" : -14,
+		"filter": {
+			"Q": 1
+		},
+		"envelope": {
+			"attack": 0.01,
+			"decay": 0.15
+		},
+		"filterEnvelope": {
+			"attack": 0.01,
+			"decay": 0.03,
+			"baseFrequency": 4000,
+			"octaves": -2.5,
+			"exponent": 4,
+
+		}
+	}).connect(lowPass);
+
+
+
+
+  var piano = null;
+
+
+    function getCongaPitches(patternString, corePitchesArray) {
+        var patternArray = patternString.split(',');
+        var count = 0;
+        var pitches = [];
+        for(let i=0; i<patternArray.length; i++) {
+            if( parseInt(patternArray[i]) > 0) {
+                pitches.push(corePitchesArray[count % corePitchesArray.length])
+                count++;
+            }
+        }
+        return pitches;
+    }
+
+    var kickPart;
+    var snarePart;
+    var congaPart;
+    var hiHatPart;
+    var hiHatRhythm;
+    var hiHatPattern;
+    var hiHatMenu;
+    var congaPattern;
+    var congaTones;
+    var congaPitches;
+    var congaMelody;
+    var congaRhythm;
+ 
+   Tone.Transport.loopEnd='0:2';
+	
+   
+  function RefreshHiHat() {
+    UpdateNotes();
+    hiHatMenu = document.getElementById("someRhythmsHH");
+    hiHatPattern = newerNotes;
+    Rhythm.setOnlyDurationString(hiHatPattern, 4);
+    hiHatRhythm = Rhythm.getTransportCode(4);
+    hiHatPart = new Tone.Part(function (time) {
+      closedHiHat.triggerAttack(time);
+    }, hiHatRhythm).start(0, "1:0");
+	hiHatPart.start(0);
+  }
+
+
+  function RefreshConga() {
+    congaPattern = newerNotes;
+    congaTones = ["G4", "Ab4", "F#4"]; //,"G4","Ab4","F#4","G4","Ab4","F#4","G4","Ab4","F#4","G4","Ab4","F#4"];
+    congaPitches = getCongaPitches(congaPattern, convertedNotes);
+
+    Rhythm.setDurationString(newerNotes, congaPitches, 3);
+    congaMelody = Rhythm.getMelodyWithRhythm(3);
+    congaRhythm = Rhythm.getTransportCode(2);
+
+    if (!conga) {
+      conga = makeConga();
+	}
+
+    congaPart = new Tone.Part(function (time, note) {
+      conga.triggerAttackRelease(note, "4n", time)
+    }, congaMelody).start(0, "1:0");
+    congaPart.loopEnd = "1:0";
+  }
+
+  function RefreshSnare(){
+    // create snare drum part
+        var snareMenu = document.getElementById("someRhythmsSD");
+        var snarePattern = "-24,24,-24,24,-24,24,-24,24";
+        //snareMenu.options[snareMenu.selectedIndex].value;
+
+        Rhythm.setOnlyDurationString(snarePattern, 2);
+        var snareRhythm = Rhythm.getTransportCode(2);
+        console.log("snareRhythm="+snareRhythm);
+        if(!snare) {
+            snare = makeSnare();
+		}
+	
+		snarePart = new Tone.Part(function(time){
+            snare.triggerAttack(time)
+		}, snareRhythm ).start(0, "1:0");
+//------------------------------------------------*/
+	}
+
+	function RefreshKick(){
+	var kickMenu = document.getElementById("someRhythmsKD");
+    var kickPattern = "48,48,48,48";
+
+    Rhythm.setOnlyDurationString(kickPattern, 1);
+    var kickRhythm = Rhythm.getTransportCode(1);
+    console.log("kickRhythm=" + kickRhythm);
+    if (!kick) {
+    kick = makeKick();
+	}
+
+    kickPart = new Tone.Part(function (time, value) {
+    kick.triggerAttackRelease("A2", "8n", time)
+    }, kickRhythm).start(0, "1:0");
+   }
+
+    function DrumMachine() {
+
+    console.log("DrumMachine");
+    // create kick drum part
+   
+	
+    //---------------------------------------------------
+
+     // create conga part
+     RefreshConga();
+
+    // create hihat part
+    RefreshHiHat();
+	
+	RefreshKick();
+
+	RefreshSnare();
+    Tone.Transport.stop();
+      Tone.Transport.start("+0.2");
+      
+    UpdateNotes();
+	
+	updateVolume();
+
+	//TRANSPORT
+	updateMute();
+
+ 
+
+
+  
+    //Tone.Transport.loop = false;
+  
+    var Loops= calc.HelperExpression({latex:'L_{oopComp}'});	
+  Loops.observe('numericValue', function () {
+    console.log(Loops.numericValue)
+   // Tone.Transport.loopEnd = '0:'+Loops.numericValue;
+   
+  })
+
+	   // var tempo = document.myForm.tempo.value;
+  var tempoNew= calc.HelperExpression({latex:'T_{empoMonitor}'});	
+  tempoNew.observe('numericValue', function () {
+   // alert("hi!")
+  Tone.Transport.bpm.value=50*tempoNew.numericValue;
+  if(playing){
+       // stopIt();
+       // calc.setExpression({ id: 'C', latex: 'C=[0,0]'});	
+      }
+  }); 
+       
+  
+      
+
+    }
+
+
+</script>
+ <script>
+    /*
+<br><br><br><br><br><br>
+<form name="myForm">
+    <hr>
+    <label> mute <input type="checkbox" name="muteKick" id="muteKick" value="muteKick"></label>| volume:<select name="volumeKick" id="volumeKick">
+        <option value="-Infinity">-Infinity (off)</option>
+        <option value="-30">-30 (quieter)</option>
+        <option value="-25">-25</option>
+        <option value="-20">-20</option>
+        <option value="-15" >-15</option>
+        <option value="-10">-10</option>
+        <option value="-5"selected>-5</option>
+        <option value="0">0 (louder)</option>
+    </select><br>
+    Kick Drum patterns:<select  name="someRhythmsKD" id="someRhythmsKD">
+    <option value="24,24,24,24,24,24,24,24">quarter notes</option>
+    <option value="48,48,48,48" selected>half notes (1, 3)</option>
+    <option value="36,12,36,12,36,12,36,12">dotted quarter, eighth</option>
+    <option value="12,36,12,36,12,36,12,36">1, 1&, 3, 3&</option>
+    <option value="36,24,24,12,36,24,24,12">1, 2&, 3&, 4&</option>
+    <option value="36,36,48,24,48">3-2 clave</option>
+    <option value="-24,24,48,36,36,24">2-3 clave</option>
+    <option value="24,12,24,12,36,12,24,48">Bo Diddley</option>
+    </select><hr>
+    
+    <label> mute <input type="checkbox" name="muteSnare" id="muteSnare" value="muteSnare"></label>| volume:<select name="volumeSnare" id="volumeSnare">
+        <option value="-Infinity">-Infinity (off)</option>
+        <option value="-30">-30 (quieter)</option>
+        <option value="-25">-25</option>
+        <option value="-20">-20</option>
+        <option value="-15" selected>-15</option>
+        <option value="-10">-10</option>
+        <option value="-5">-5</option>
+        <option value="0">0 (louder)</option>
+    </select><br>
+var pattern1="-24,-48,12,24,-12,24,12,24";
+ 
+    Snare Drum patterns:<select  name="someRhythmsSD" id="someRhythmsSD">
+    <option value="-24,24,-24,24,-24,24,-24,24">quarter notes</option> 
+    <option value="-24,24,-24,24,-24,24,-24,24" selected>back beat (2, 4)</option>
+    <option value="-12,24,36,24,-12,24,36,24">1&, 2&, 4</option>
+    <option value="-12,24,24,24,12,-12,24,24,24,12">1&, 2&, 3&, 4&</option>
+    <option value="-24,18,6,-24,24,-24,18,6,-24,24">2, 2&a, 4</option>
+    <option value="-12,6,6,-12,6,6,-12,12,-12,12,-12,6,6,-12,6,6,-12,12,-12,12">1&,1&a,2&,2&a,3&,4&</option>
+    <option value="18,6,6,12,6,18,6,6,12,6">dotted eighth, sixteenth, sixteenth, eighth, sixteen</option>
+    <option value="36,36,48,24,48">3-2 clave</option>
+    <option value="-24,24,48,36,36,24">2-3 clave</option>
+    <option value="24,12,24,12,24,-12,12,24,24,-24">Bo Diddley</option>
+    </select><hr>
+    
+    <label> mute <input type="checkbox" name="muteConga" id="muteConga" value="muteSnare"></label>| volume:<select name="volumeConga" id="volumeConga">
+        <option value="-Infinity">-Infinity (off)</option>
+        <option value="-30">-30 (quieter)</option>
+        <option value="-25">-25</option>
+        <option value="-20">-20</option>
+        <option value="-15" selected>-15</option>
+        <option value="-10">-10</option>
+        <option value="-5">-5</option>
+        <option value="0">0 (louder)</option>
+    </select><br>
+ 
+
+   Conga patterns:<select  name="someRhythmsCD" id="someRhythmsCD">
+    <option value="12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12"selected>quarter notes</option>
+    <option value="12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12">eighth notes</option>
+    <option value="24,12,12,24,12,12,24,12,12,24,12,12">1, 2, 2&, 3, 4, 4&</option>
+    <option value="-24,24,-24,12,12,-24,24,-24,12,12">2, 4, 4&</option>
+    <option value="6,12,6,6,12,6,6,12,6,6,12,6,6,12,6,6,12,6,6,12,6,6,12,6">sixteenth, eighth, sixteenth</option>
+    <option value="6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6">sixteenths</option>
+    <option value="18,6,6,12,6,18,6,6,12,6,18,6,6,12,6,18,6,6,12,6">dotted eighth, sixteenth, sixteenth, eighth, sixteen</option>
+    <option value="36,36,48,24,48">3-2 clave</option>
+    <option value="-24,24,48,36,36,24">2-3 clave</option>
+    <option value="24,12,24,12,24,-12,12,24,24,-24">Bo Diddley</option>
+    </select><hr>
+
+
+    <label> mute <input type="checkbox" name="muteHiHat" id="muteHiHat" value="muteHiHat"></label>| volume:<select name="volumeHiHat" id="volumeHiHat">
+        <option value="-Infinity">-Infinity (off)</option>
+        <option value="-30">-30 (quieter)</option>
+        <option value="-25">-25</option>
+        <option value="-20">-20</option>
+        <option value="-15" selected>-15</option>
+        <option value="-10">-10</option>
+        <option value="-5">-5</option>
+        <option value="0">0 (louder)</option><br>
+    </select><br>
+    <script>
+      /*
+    HiHat patterns:<select  name="someRhythmsHH" id="someRhythmsHH">
+    <option value=<span id="newRhythm"></span>>quarter notes</option>
+    <option value="12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12" selected>eighth notes</option>
+    <option value="12,6,6,12,6,6,12,6,6,12,6,6,12,6,6,12,6,6,12,6,6,12,6,6">eighth, two sixteenths</option>
+    <option value="6,6,12,6,6,12,6,6,12,6,6,12,6,6,12,6,6,12,6,6,12,6,6,12">two sixteenths, eighth</option>
+    <option value="6,12,6,6,12,6,6,12,6,6,12,6,6,12,6,6,12,6,6,12,6,6,12,6">sixteenth, eighth, sixteenth</option>
+    <option value="6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6">sixteenths</option>
+    <option value="18,6,6,12,6,18,6,6,12,6,18,6,6,12,6,18,6,6,12,6">dotted eighth, sixteenth, sixteenth, eighth, sixteen</option>
+    <option value="36,36,48,24,24,-24">3-2 clave</option>
+    <option value="-24,24,48,36,36,24">2-3 clave</option>
+    <option value="24,12,24,12,24,-12,12,24,24,-24">Bo Diddley</option>
+    </select>
+    </p>
+
+    <p>
+    
+     tempo:<select name="tempo" id="tempo"  onchange="updateTempo()">
+        <option value=60>60</option>
+        <option value=70>70</option>
+        <option value=80>80</option>
+        <option value=90>90</option>
+        <option value=100 selected>100</option>
+        <option value=110>110</option>
+        <option value=120>120</option>
+        <option value=130>130</option>
+        <option value=140>140</option>
+        <option value=160>160</option>
+        <option value=180>180</option>
+        <option value=200>200</option>
+    </select>
+    </p>
+    </form>
+        */
+  </script>
+    
+    
+
+    
+    <script>
+    
+
+        //var mybuttonTimeDelay = document.getElementById("buttonTime");
+        //var mybuttonMaria = document.getElementById("buttonMaria");
+        var mybuttonDrumMachine = document.getElementById("buttonDrumMachine");
+    
+        // onclick bindings
+      //  mybuttonTimeDelay.onclick = playDelay;
+       // mybuttonMaria.onclick = Maria;
+        mybuttonDrumMachine.onclick = DrumMachine;
+       
+   
+
+        // onchange bindings
+       // var myMuteKickCheckbox = document.getElementById("muteKick");
+        //var myMuteSnareCheckbox = document.getElementById("muteSnare");
+        //var myMuteCongaCheckbox = document.getElementById("muteConga");
+        //var myMuteHiHatCheckbox = document.getElementById("muteHiHat");
+        
+        myMuteKickCheckbox.onchange = updateMute;
+        myMuteSnareCheckbox.onchange = updateMute;
+        myMuteCongaCheckbox.onchange = updateMute;
+        myMuteHiHatCheckbox.onchange = updateMute;
+    
+        var myVolumeKickMenu = -5;
+        var myVolumeSnareMenu = -10
+        var myVolumeCongaMenu = -10;
+        var myVolumeHiHatMenu = -10;
+        
+        myVolumeKickMenu.onchange = updateVolume;
+        myVolumeSnareMenu.onchange = updateVolume;
+        myVolumeCongaMenu.onchange = updateVolume;
+        myVolumeHiHatMenu.onchange = updateVolume;
+        
+        var myDelayMenu = document.getElementById("delay");
+    //    myDelayMenu.onchange = updateDelayTime;
+        
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,127 @@
+% GIF stuff
+% filename = 'outbreak_00.gif';
+% gif_flag = 0;
+
+% number of people
+N = 200;
+
+% array for tracking infected
+Infected = zeros(1,N);
+Infected(1) = 1;
+
+% timing of infection
+Date = zeros(1,N);
+
+% dimensions of the box
+L = 10;
+W = 10;
+
+% infection radius
+R = 0.2;
+
+% recovery time
+Recovery = 15;
+
+% speed
+v = 1;
+
+% random initial positions
+X_0 = L * rand(1,N);
+Y_0 = W * rand(1,N);
+
+% shelter in place probability
+s = 0;
+S = rand(1,N) > s;
+
+% random initial velocities
+Theta = 2*pi*rand(1,N);
+U = zeros(1,N);
+V = zeros(1,N);
+U(1) = v*cos(Theta(1));
+V(1) = v*sin(Theta(1));
+U(2:end) = v*cos(Theta(2:end)).*S(2:end);
+V(2:end) = v*sin(Theta(2:end)).*S(2:end);
+
+% time array
+t_max = 50;
+t_step = 0.1;
+
+% current positions
+X = zeros(1,N);
+Y = zeros(1,N);
+
+% initialize distance matrix
+D = zeros(N,N);
+
+% tracking of how many sick and recovered
+K = length(0:t_step:t_max);
+status = zeros(K,3);
+count = 0;
+for t = 0:t_step:t_max
+    count = count + 1;
+
+    % some individuals recover
+    for i = find(Infected==1)
+        if t - Date(i) >= Recovery
+            Infected(i) = 2;
+        end
+    end
+
+    % update coordinates
+    X = X_0 + U*t;
+    Y = Y_0 + V*t;
+    K_x = floor(X/L);
+    K_y = floor(Y/W);
+    X = mod(X,L).*(mod(K_x,2)==0) + (L-mod(X,L)).*(mod(K_x,2)==1);
+    Y = mod(Y,W).*(mod(K_y,2)==0) + (W-mod(Y,W)).*(mod(K_y,2)==1);
+
+    % infect neighbors
+    for i = find(Infected==1)
+        for j = [1:i-1 i+1:N]
+            if sqrt((X(i)-X(j))^2 + (Y(i)-Y(j))^2) < R && Infected(j) == 0
+                Infected(j) = 1;
+                Date(j) = t;
+            end
+        end
+    
+    
+    % count the number of each type
+    status(count,1) = sum(Infected==1);
+    status(count,2) = sum(Infected==0);
+    status(count,3) = sum(Infected==2);
+
+    % plot the borders
+    figure(1);
+    clf;
+    hold on;
+    axis off;
+    set(gca,'Position',[0 0 1 1]);
+    plot([0, L, L, 0, 0],[0, 0, W, W, 0] - W,'k');
+
+    % plot the individuals
+    plot(X(Infected==0),Y(Infected==0) - W,'b.','MarkerSize',20);
+    plot(X(Infected==1),Y(Infected==1) - W,'r.','MarkerSize',20);
+    plot(X(Infected==2),Y(Infected==2) - W,'.','Color',[1 0.7 0.7],'MarkerSize',20);
+    h = area((0:t_step:t_max)*L/t_max,status*W/N/3);
+    h(1).FaceColor = [1 0 0];
+    h(3).FaceColor = [1 0.7 0.7];
+    h(2).FaceColor = [0 0 1];
+    drawnow;
+
+    % GIF stuff
+%     frame = getframe(1);
+%     im = frame2im(frame);
+%     [imind,cm] = rgb2ind(im,256);
+%     if gif_flag == 0
+%         imwrite(imind,cm,filename,'gif','Loopcount',inf,'DelayTime',0.05);
+%         gif_flag = 1;
+%     else
+%         imwrite(imind,cm,filename,'gif','WriteMode','append','DelayTime',0.05);
+%     end
+end
+
+% GIF stuff
+% frame = getframe(1);
+% im = frame2im(frame);
+% [imind,cm] = rgb2ind(im,256);
+% imwrite(imind,cm,filename,'gif','WriteMode','append','DelayTime',2);

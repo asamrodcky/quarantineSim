@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+        integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+    <!-- Index CSS -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Desmos Graph CDN -->
+    <script src="https://www.desmos.com/api/v1.4/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"></script>
+</head>
+
+<body>
+    <div id="calculator"></div>
+    <section>
+        <canvas id="population" width="2000" height="1200"></canvas>
+        <div class="info">
+            <canvas id="graph" height="400" width="1500"></canvas>
+            <ul>
+                <li><span>Recovered</span><span id="recovered">0</span></li>
+                <li><span>Healthy</span><span id="healthy">0</span></li>
+                <li><span>Sick</span><span id="sick">0</span></li>
+                <li><span>Dead</span><span id="dead">0</span></li>
+            </ul>
+        </div>
+        <div id="overlay" class="active">
+            <p>
+                A social distance simulator based on <a
+                    href="https://www.washingtonpost.com/graphics/2020/world/corona-simulator/">the incredible work done
+                    by the Washington Post</a>.
+                This simulator assumes a 1% mortality rate.
+            </p>
+            <div class="field is-grouped">
+                <span class="select">
+                    <select id="quarantine">
+                        <option value="0" selected>No Social Distancing</option>
+                        <option value="0.1">One-Tenth Self-Quarantine</option>
+                        <option value="0.25">One Quarter Self-Quarantine</option>
+                        <option value="0.33">One Third Self-Quarantine</option>
+                        <option value="0.5">One Half Self-Quarantine</option>
+                        <option value="0.75">Three Quarters Self-Quarantine</option>
+                        <option value="1">Everyone Self-Quarantines</option>
+                    </select>
+                </span>
+                &nbsp;
+                <button class="button is-primary" id="run">Run</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- jQuery JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"
+        integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
+        crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"
+        integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6"
+        crossorigin="anonymous"></script>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
